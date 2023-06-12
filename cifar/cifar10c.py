@@ -118,6 +118,8 @@ def setup_cotta(model):
     logger.info(f"optimizer for adaptation: %s", optimizer)
     return cotta_model
 
+# def setup_prompt(model,prompt):
+    
 
 def setup_optimizer(params):
     """Set up optimizer for tent adaptation.

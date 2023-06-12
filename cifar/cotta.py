@@ -64,6 +64,11 @@ class CoTTA(nn.Module):
         self.steps = steps
         assert steps > 0, "cotta requires >= 1 step(s) to forward and update"
         self.episodic = episodic
+    
+#`model_state`: 字典，包含了模型的所有参数的状态。这个状态可以用来重置模型的参数，以便在适应过程中进行恢复。
+#`optimizer_state`: 字典，包含了优化器的状态。这个状态可以用来重置优化器的状态，以便在适应过程中进行恢复。
+#`ema_model`: 模型的深拷贝，用于指数移动平均。在适应过程中，模型的参数会被更新，但是指数移动平均需要使用模型的旧参数。因此，我们需要一个深拷贝来保存模型的旧参数。
+#`model_anchor`: 模型的深拷贝，用于重置模型的参数。在适应过程中，模型的参数会被更新，但是在某些情况下，我们需要重置模型的参数。因此，我们需要一个深拷贝来保存模型的初始参数。
         
         self.model_state, self.optimizer_state, self.model_ema, self.model_anchor = \
             copy_model_and_optimizer(self.model, self.optimizer)
@@ -104,16 +109,20 @@ class CoTTA(nn.Module):
             outputs_  = self.model_ema(self.transform(x)).detach()
             outputs_emas.append(outputs_)
         # Threshold choice discussed in supplementary
-        if anchor_prob.mean(0)<self.ap:
+        if anchor_prob.mean(0)<self.ap: #预测不自信，用增强平均值增加模型鲁棒性，减少模型对输入数据的依赖，提高泛化能力
+            #`outputs_emas` 是一个包含了 `N` 个张量的列表，每个张量的维数都是 `(batch_size, num_classes)`
+            # `torch.stack(outputs_emas)` 将这 `N` 个张量沿着新的维度进行堆叠，得到一个新的张量，其维数为 `(N, batch_size, num_classes)`。
+            # `.mean(0)` 计算沿着第一个维度的平均值，得到一个维数为 `(batch_size, num_classes)` 的张量，即 `outputs_ema`。
             outputs_ema = torch.stack(outputs_emas).mean(0)
-        else:
+        else: #自信，表明数据变化程度较小？使用模型输出的指数移动平均值作为模型的输出可以减少模型的震荡，从而提高模型的稳定性。
+            #因为指数移动平均值是对模型输出的历史值进行加权平均得到的，可以减少模型输出的波动，从而提高模型的稳定性。
             outputs_ema = standard_ema
         # Student update
         loss = (softmax_entropy(outputs, outputs_ema)).mean(0) 
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        # Teacher update
+        # Teacher update ;self.model:当前模型参数，self.model_ema:指数移动平均模型参数
         self.model_ema = update_ema_variables(ema_model = self.model_ema, model = self.model, alpha_teacher=self.mt)
         # Stochastic restore
         if True:
