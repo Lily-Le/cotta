@@ -173,7 +173,7 @@ def evaluate(description):
         ckpt = torch.load(args.resume)
         prompter.load_state_dict(ckpt['state_dict'])
         model = setup_vpt(base_model,prompter)
-        # model.optimizer.load_state_dict(ckpt['optimizer'])
+        model.optimizer.load_state_dict(ckpt['optimizer'])
     # evaluate on each severity and type of corruption in turn
     
     df0 = pd.DataFrame(data=[vars(args).values()], columns=vars(args).keys())

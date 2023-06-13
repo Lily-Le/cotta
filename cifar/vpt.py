@@ -85,8 +85,8 @@ class VPT_wrapper(nn.Module):
         self.prompter_state,self.ema_prompter,self.optimizer_state =\
             copy_model_and_optimizer(prompter, self.optimizer)
         # self.prompter_state,self.model, self.model_ema,self.optimizer_state  = \
-
-        self.model_ema = nn.Sequential(self.ema_prompter,model)
+        # 改为不是公用一个source model
+        self.model_ema = nn.Sequential(self.ema_prompter,deepcopy(model))
 
         self.transform = get_tta_transforms()    
         self.mt = args.mt_alpha #指数移动平均系数 
@@ -130,8 +130,11 @@ class VPT_wrapper(nn.Module):
         for i in range(N):
             outputs_  = self.model_ema(self.transform(x)).detach()
             outputs_emas.append(outputs_)
-            loss += (softmax_entropy(outputs, outputs_)).mean(0)
-        # outputs_ema = torch.stack(outputs_emas).mean(0)
+            # 每个transform都优化的话：
+            # loss += (softmax_entropy(outputs, outputs_)).mean(0)
+        # 只优化mean
+        outputs_ema = torch.stack(outputs_emas).mean(0)
+        loss = (softmax_entropy(outputs, outputs_ema)).mean(0) 
 
     # 
         # loss = (softmax_entropy([outputs]*N, outputs_emas)).mean(0) 
@@ -198,6 +201,7 @@ def configure_model(args,model,prompter):
     prompter.train()
     # prompter.eval()
     # disable grad, to (re-)enable only what we update
+    # model.train() # if change bn statistics
     model.eval()
     model.requires_grad_(False)
     # enable all trainable
@@ -205,7 +209,7 @@ def configure_model(args,model,prompter):
         param.requires_grad_(True)
     for param in model.parameters():
         param.requires_grad_(False)
-    if args.norm ==True:
+    if args.norm ==True: # if change bn statistics,default=false
         for m in model.modules():
             if isinstance(m, nn.BatchNorm2d):
                 # m.requires_grad_(True)
