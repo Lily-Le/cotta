@@ -210,10 +210,12 @@ def main():
         transforms.ToTensor(),
         # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
-    transform_train= get_tta_transforms()   
-    transform_train.transforms.insert(0,transforms.ToTensor())
-
-    transform_test = transforms.Compose([
+    
+    ## TTA  transform当成domain change,拿来作validation dataset()
+    transform_test= get_tta_transforms()   
+    transform_test.transforms.insert(0,transforms.ToTensor())
+    # ddecorate里面有tta transform,只做tensor化
+    transform_train = transforms.Compose([
         transforms.ToTensor(),
         # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -225,10 +227,10 @@ def main():
         num_classes = 100
 
 
-    trainset = dataloader(root='./data', train=True, download=True, transform=transform_test)
+    trainset = dataloader(root='./data', train=True, download=True, transform=transform_train)
     train_loader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
-    testset = dataloader(root='./data', train=False, download=False, transform=transform_train)
+    testset = dataloader(root='./data', train=False, download=False, transform=transform_test)
     val_loader = data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     # define criterion and optimizer
 

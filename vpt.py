@@ -78,7 +78,7 @@ class VPT_wrapper(nn.Module):
             copy_model_and_optimizer(prompter, self.optimizer)
         # self.prompter_state,self.model, self.model_ema,self.optimizer_state  = \
 
-        self.model_ema = nn.Sequential(self.ema_prompter,model)
+        self.model_ema = nn.Sequential(self.ema_prompter,deepcopy(model))
 
         self.transform = get_tta_transforms()    
         self.mt = mt_alpha
@@ -124,7 +124,7 @@ class VPT_wrapper(nn.Module):
             outputs_emas.append(outputs_)
         # Threshold choice discussed in supplementary
         # if anchor_prob.mean(0)<self.ap: #预测不自信，用增强平均值增加模型鲁棒性，减少模型对输入数据的依赖，提高泛化能力
-            #`outputs_emas` 是一个包含了 `N` 个张量的列表，每个张量的维数都是 `(batch_size, num_classes)`
+            #`outputs_emas` N个张量的列表，每个张量的维数都是 `(batch_size, num_classes)`
             # `torch.stack(outputs_emas)` 将这 `N` 个张量沿着新的维度进行堆叠，得到一个新的张量，其维数为 `(N, batch_size, num_classes)`。
             # `.mean(0)` 计算沿着第一个维度的平均值，得到一个维数为 `(batch_size, num_classes)` 的张量，即 `outputs_ema`。
             # outputs_ema = torch.stack(outputs_emas).mean(0)
@@ -132,6 +132,7 @@ class VPT_wrapper(nn.Module):
             #因为指数移动平均值是对模型输出的历史值进行加权平均得到的，可以减少模型输出的波动，从而提高模型的稳定性。
         # outputs_ema = standard_ema
         # Student update
+        # 所以有无mean teacher?
         outputs_ema = torch.stack(outputs_emas).mean(0)
         loss = (softmax_entropy(outputs, outputs_ema)).mean(0) 
         loss.backward()
